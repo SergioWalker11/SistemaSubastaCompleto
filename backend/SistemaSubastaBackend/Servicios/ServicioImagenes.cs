@@ -1,0 +1,56 @@
+using SistemaSubastaBackend.Interfaces;
+using SistemaSubastaBackend.Modelos;
+
+namespace SistemaSubastaBackend.Servicios;
+
+public class ServicioImagenes : IServicioImagenes
+{
+    private readonly string _rutaBase;
+    private readonly IRepositorioImagenes _repositorio;
+
+    public ServicioImagenes(IConfiguration configuracion, IRepositorioImagenes repositorio)
+    {
+        _rutaBase = Path.Combine(Directory.GetCurrentDirectory(), "ImagenesProductos");
+        _repositorio = repositorio;
+    }
+
+    public async Task<ImagenProducto> SubirImagenAsync(int productoId, IFormFile archivo, bool esPrincipal)
+    {
+        if (archivo == null || archivo.Length == 0)
+            throw new ArgumentException("Archivo no proporcionado");
+
+        var extensionesPermitidas = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        var extension = Path.GetExtension(archivo.FileName).ToLower();
+        if (!extensionesPermitidas.Contains(extension))
+            throw new ArgumentException("Solo se permiten archivos JPG, PNG y WebP");
+
+        if (!Directory.Exists(_rutaBase))
+            Directory.CreateDirectory(_rutaBase);
+
+        var nombreArchivo = $"{Guid.NewGuid()}{extension}";
+        var rutaCompleta = Path.Combine(_rutaBase, nombreArchivo);
+
+        using var stream = new FileStream(rutaCompleta, FileMode.Create);
+        await archivo.CopyToAsync(stream);
+
+        var imagen = new ImagenProducto
+        {
+            ProductoId = productoId,
+            RutaArchivo = nombreArchivo,
+            EsPrincipal = esPrincipal,
+            Orden = 0
+        };
+
+        return await _repositorio.CrearAsync(imagen);
+    }
+
+    public async Task<List<ImagenProducto>> ObtenerPorProductoAsync(int productoId)
+    {
+        return await _repositorio.ObtenerPorProductoAsync(productoId);
+    }
+
+    public async Task EliminarAsync(int id)
+    {
+        await _repositorio.EliminarAsync(id);
+    }
+}
